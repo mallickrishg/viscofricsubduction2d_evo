@@ -1,3 +1,0 @@
-#patch file generated automatically - 2D ramp model, constant patch size
-# n  Vpl    x1        x2       x3   Length    Width     Strike        Dip  Rake      L0     W0    qL qW
-  1   1  -30e3       150e3    0e3    300e3     58e3       270         30.0  90     300e3    1e3   1  1 
