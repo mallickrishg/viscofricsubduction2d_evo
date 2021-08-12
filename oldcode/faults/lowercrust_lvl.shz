@@ -1,0 +1,3 @@
+# shear zone model for lower crust/upper mantle
+# n    x1    x2    x3     length  width   thickness   strike  dip        lo       wo        to        alphal alphaw alphat
+1  -600e3    0e3  30e3     1200e3  500e3     10000e3     0.0    90      25e3     25e3     10000e3      1.0    1.0    1.0
