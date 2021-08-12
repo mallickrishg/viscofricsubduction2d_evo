@@ -3,12 +3,11 @@
 % Rishav Mallick, EOS, 2021
 
 clear
-% close all
-% addpath ~/Dropbox/scripts/utils/
+
 addpath ODESolving/
 addpath odefunction/
 addpath greenfunc/
-addpath ~/Dropbox/scripts/topotoolbox/colormaps/
+% addpath ~/Dropbox/scripts/topotoolbox/colormaps/
 addpath ~/Dropbox/scripts/unicycle/matlab/
 import unicycle.*
 
