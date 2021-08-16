@@ -1,9 +1,9 @@
-function [rcv,shz,src] = create_flt_shz(earthModel,y2i,y3i,Fwidth,Mf,Vwidth,Mv,Vwidthbot,Mvbot,Tpl)
+function [rcv,shz,src] = create_flt_shz(earthModel,y2i,y3i,dip,Fwidth,Mf,Vwidth,Mv,Vwidthbot,Mvbot,Tpl)
 
 addpath ~/Dropbox/scripts/unicycle/matlab/
 import unicycle.*
 
-dip = 10;
+% dip = 10;
 fault_length = 500e4;
 
 
