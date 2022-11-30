@@ -24,6 +24,7 @@ rcv = unicycle.geometry.receiver(patchfname,earthModel);
 
 
 %% viscous shear zone (as a zero-width approximation)
+y2hinge = -Tpl*tand(dip/2);
 
 % width of patch segments
 w = Vwidth/Mv;
@@ -43,11 +44,11 @@ fprintf(fileID,'%d %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %
 w = Vwidthbot/Mvbot;
 % segment 2 - Tpl below the fault at dip
 fprintf(fileID,'%d %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %d %d\n',...
-    1, -1,-fault_length/2, y2i, y3i+Tpl,fault_length, Vwidthbot, 0, dip, 90, fault_length, w, 1.0, 1.0);
+    1, -1,-fault_length/2, y2hinge, y3i+Tpl,fault_length, Vwidthbot, 0, dip, 90, fault_length, w, 1.0, 1.0);
 
 % segment 3 - Tpl below the fault (flat)
 fprintf(fileID,'%d %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %d %d\n',...
-    1, -1,-fault_length/2, y2i-Vwidthbot, y3i+Tpl,fault_length, Vwidthbot, 0, 0*dip, 90, fault_length, w, 1.0, 1.0);
+    1, -1,-fault_length/2, y2hinge-Vwidthbot, y3i+Tpl,fault_length, Vwidthbot, 0, 0*dip, 90, fault_length, w, 1.0, 1.0);
 
 fclose(fileID);
 
@@ -71,11 +72,11 @@ fprintf(fileID,'%d %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %
 
 % segment 2 - Tpl below the fault at dip
 fprintf(fileID,'%d %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %d %d\n',...
-    1, -1,-fault_length/2, y2i+(Vwidthbot)*cosd(dip), y3i+Tpl+(Vwidthbot)*sind(dip),fault_length, w+Fwidth, 0, dip, 90, fault_length, w+Fwidth, 1.0, 1.0);
+    1, -1,-fault_length/2, y2hinge+(Vwidthbot)*cosd(dip), y3i+Tpl+(Vwidthbot)*sind(dip),fault_length, w+Fwidth, 0, dip, 90, fault_length, w+Fwidth, 1.0, 1.0);
 
 % segment 3 - Tpl below the fault (flat)
 fprintf(fileID,'%d %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %d %d\n',...
-    1, -1,-fault_length/2, y2i-Vwidthbot-w, y3i+Tpl,fault_length, w, 0, 0*dip, 90, fault_length, w, 1.0, 1.0);
+    1, -1,-fault_length/2, y2hinge-Vwidthbot-w, y3i+Tpl,fault_length, w, 0, 0*dip, 90, fault_length, w, 1.0, 1.0);
 
 fclose(fileID);
 
