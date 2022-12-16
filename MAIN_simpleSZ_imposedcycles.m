@@ -4,8 +4,8 @@
 
 clear
 
+addpath functions/
 addpath odefunction/
-addpath greenfunc/
 import fgeom.*
 addpath ~/Dropbox/scripts/topotoolbox/colormaps/
 % addpath ~/Dropbox/scripts/unicycle/matlab/
@@ -31,7 +31,7 @@ Vwidthbot = 500e3;
 Mvbot = 50;% number of patches
 
 % plate thickness
-Tplate = 50e3;
+Tplate = 20e3;
 %% Create faults and shear zones
 earthModel = fgeom.LDhs(G,nu);
 [rcv,shz,src] = create_flt_shz(earthModel,[y2i,y3i],dip,Fwidth,Mf,Vwidth,Mv,Vwidthbot,Mvbot,Tplate);
@@ -67,8 +67,7 @@ colorbar
 
 % effective confining pressure on fault (MPa)
 % rcv.sigma = 600*ones(rcv.N,1);
-% rcv.sigma(rcv.xc(:,1)<150e3) = 150;
-rcv.sigma = linspace(100,400,rcv.N)';
+rcv.sigma = linspace(600,400,rcv.N)';
 
 % frictional parameters
 rcv.a = 1e-2*ones(rcv.N,1);
@@ -103,15 +102,16 @@ disp('Assigned Frictional Properties')
 shz.Vpl = Vpl.*shz.Vpl;
 
 % Viscosity in Pa-s
-etaval_arc = 1e17;
+etaval_arc = 1e14;
 % etaval_arc = logspace(13,15,length(find(shz.Vpl>0)))';
 % etaval_arc = 1e13.*logspace(1,-1,length(find(shz.Vpl>0)))';
-power_arc = 5;%linspace(3,1,Mv);
-etaval_oc = 1e15;
-power_oc = 3;
+power_arc = 3;%linspace(3,1,Mv);
+etaval_oc = 1e16;
+power_oc = 1;
 
 shz.n = ones(shz.N,1);% store power in 'tmax' parameter
 shz.n(shz.Vpl>0) = power_arc;
+shz.n(shz.Vpl<0) = power_oc;
 shz.Ainverse = ones(shz.N,1);
 shz.Ainverse(shz.Vpl>0) = etaval_arc*1e-6;% store viscosity in 'a' parameter
 shz.Ainverse(shz.Vpl<0) = etaval_oc*1e-6;
@@ -281,7 +281,10 @@ end
 % plot lines - time series
 figure(100),clf
 plot(ox./1e3,usurf_h(end,:),'k-','Linewidth',2), hold on
+% plot(ox./1e3,GF_d.src.Gh*(t(end)*Vpl*src.Vpl),'k--','Linewidth',2)
 plot(ox./1e3,usurf_z(end,:),'r-','Linewidth',2)
+% plot(ox./1e3,GF_d.src.Gz*(t(end)*Vpl*src.Vpl),'r--','Linewidth',2)
+
 axis tight, grid on
 % ylim([-1 1]*2)
 xlabel('x_2 (km)'), ylabel('u (m)')
@@ -408,7 +411,7 @@ set(gca,'Fontsize',20,'Linewidth',2)
 % horizontal motion
 
 % cspec = parula(length(plotindex));
-if false
+if true
     figure(12),clf
     set(gcf,'Name','Horizontal velocity contributions')
     for i = 1:length(plotindex)
@@ -426,17 +429,17 @@ if false
     subplot(321)
     title('Oceanic mantle')
     axis tight, grid on
-    ylim([-1 2])
+    ylim([-1 1])
     xlabel('x_2 (km)')
     ylabel('v_h/v_{pl}')
-    set(gca,'Fontsize',20,'LineWidth',2)
+    set(gca,'Fontsize',15,'LineWidth',2)
     subplot(322)
     title('Oceanic mantle')
     axis tight, grid on
     ylim([-1 1])
     xlabel('x_2 (km)')
     ylabel('v_z/v_{pl}')
-    set(gca,'Fontsize',20,'LineWidth',2)
+    set(gca,'Fontsize',15,'LineWidth',2)
     
     for i = 1:length(plotindex)
         tindex = find(abs(t-plotindex(i))==min(abs(t-plotindex(i))),1);
@@ -456,14 +459,14 @@ if false
     ylim([-1 1])
     xlabel('x_2 (km)')
     ylabel('v_h/v_{pl}')
-    set(gca,'Fontsize',20,'LineWidth',2)
+    set(gca,'Fontsize',15,'LineWidth',2)
     subplot(324)
     title('Arc mantle')
     axis tight, grid on
     ylim([-1 1])
     xlabel('x_2 (km)')
     ylabel('v_z/v_{pl}')
-    set(gca,'Fontsize',20,'LineWidth',2)
+    set(gca,'Fontsize',15,'LineWidth',2)
     
     for i = 1:length(plotindex)
         tindex = find(abs(t-plotindex(i))==min(abs(t-plotindex(i))),1);
@@ -481,14 +484,14 @@ if false
     ylim([-1 1])
     xlabel('x_2 (km)')
     ylabel('v_h/v_{pl}')
-    set(gca,'Fontsize',20,'LineWidth',2)
+    set(gca,'Fontsize',15,'LineWidth',2)
     subplot(326)
     title('Fault')
     axis tight, grid on
     ylim([-1 1])
     xlabel('x_2 (km)')
     ylabel('v_z/v_{pl}')
-    set(gca,'Fontsize',20,'LineWidth',2)
+    set(gca,'Fontsize',15,'LineWidth',2)
 end
 % return
 %% make plots of fault+shz slip rates

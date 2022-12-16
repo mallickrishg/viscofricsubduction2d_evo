@@ -1,21 +1,21 @@
 function evl =  compute_stresskernels(rcv,shz)
 
 % fault-fault
-[Ktau,~] = computetractionkernels(rcv,rcv);
+[Ktau,~] = fgeom.computetractionkernels(rcv,rcv);
 
 evl = [];
 evl.KK = Ktau;
 
 %fault - shearzone
-[Ktau,~] = computetractionkernels(rcv,shz);
+[Ktau,~] = fgeom.computetractionkernels(rcv,shz);
 evl.KL = Ktau;
 
 %shearzone - shearzone
-[Ktau,~] = computetractionkernels(shz,shz);
+[Ktau,~] = fgeom.computetractionkernels(shz,shz);
 evl.LL = Ktau;
 
 %shearzone - fault
-[Ktau,~] = computetractionkernels(shz,rcv);
+[Ktau,~] = fgeom.computetractionkernels(shz,rcv);
 evl.LK = Ktau;
 
 

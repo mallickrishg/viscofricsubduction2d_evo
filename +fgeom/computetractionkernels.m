@@ -9,7 +9,7 @@ z = rcv.xc(:,2);
 
 for i = 1:src.N
     m = [src.x(i,2) src.x(i,1) src.W(i) src.dip(i) 1];
-    [Sxx,Sxz,Szz]=EdgeStress(m,x,z,src.earthModel.nu,src.earthModel.G);
+    [Sxx,Sxz,Szz] = fgeom.EdgeStress(m,x,z,src.earthModel.nu,src.earthModel.G);
     
     t=[Sxx.*rcv.nv(:,1)+Sxz.*rcv.nv(:,2), ...
         Sxz.*rcv.nv(:,1)+Szz.*rcv.nv(:,2)];
