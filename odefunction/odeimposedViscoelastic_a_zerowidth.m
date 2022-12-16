@@ -26,11 +26,8 @@ Yp(1:ss.dgf:ss.N*ss.dgf) = V;
 
 s12 = Y(ss.N*ss.dgf+1:shz.dgf:ss.N*ss.dgf+shz.N*shz.dgf);
 
-if shz.tMax==1  % power  
-    e12dot = (s12)./shz.a;
-else
-    error('Not a valid rheology - change power/combo')
-end
+e12dot = (abs(s12).^(shz.n-1)).*s12./shz.Ainverse;
+% e12dot = (s12.^shz.tMax)./shz.a;
 
 % strain rates
 Yp(ss.N*ss.dgf+2:shz.dgf:ss.N*ss.dgf+shz.N*shz.dgf) = e12dot;

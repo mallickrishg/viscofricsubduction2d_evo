@@ -1,11 +1,9 @@
-function [rcv,shz,src] = create_flt_shz(earthModel,y2i,y3i,dip,Fwidth,Mf,Vwidth,Mv,Vwidthbot,Mvbot,Tpl)
+function [rcv,shz,src] = create_flt_shz(earthModel,x0z0,dip,Fwidth,Mf,Vwidth,Mv,Vwidthbot,Mvbot,Tpl)
 
-addpath ~/Dropbox/scripts/unicycle/matlab/
-import unicycle.*
+import fgeom.*
 
-% dip = 10;
-fault_length = 500e4;
-
+y2i = x0z0(1);
+y3i = x0z0(2);
 
 %% megathrust fault file
 patchfname = 'megathrust2d.seg';
@@ -15,12 +13,12 @@ w = Fwidth/Mf;
 
 fileID = fopen(patchfname,'w');
 fprintf(fileID,'%s\n',...
-    '# n  Vpl    x1     x2   x3   Length   Width   Strike  Dip  Rake    L0    W0    qL  qW');
-fprintf(fileID,'%d %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %d %d\n',...
-    1, 1,-fault_length/2, y2i, y3i,fault_length, Fwidth, 0, dip, 90, fault_length, w, 1.0, 1.0);
+    '# n  Vpl,  x   z    Width   Dip   W0   qW');
+fprintf(fileID,'%d %.18f %.18f %.18f %.18f %.18f %.18f %d\n',...
+    1, 1, y2i, y3i, Fwidth, dip, w, 1.0);
 fclose(fileID);
 
-rcv = unicycle.geometry.receiver(patchfname,earthModel);
+rcv = fgeom.receiver(patchfname,earthModel);
 
 
 %% viscous shear zone (as a zero-width approximation)
@@ -33,54 +31,54 @@ patchvname = 'viscousfault2d.seg';
 
 fileID = fopen(patchvname,'w');
 fprintf(fileID,'%s\n',...
-    '# n  Vpl    x1     x2   x3   Length   Width   Strike  Dip  Rake    L0    W0    qL  qW');
+    '# n  Vpl x2   x3    Width   Dip W0   qW');
 
 % Three segments
 
 % segment 1 - below the fault
-fprintf(fileID,'%d %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %d %d\n',...
-    1, 1,-fault_length/2, y2i+Fwidth*cosd(dip), y3i+Fwidth*sind(dip),fault_length, Vwidth, 0, dip, 90, fault_length, w, 1.0, 1.0);
+fprintf(fileID,'%d %.18f %.18f %.18f %.18f %.18f %.18f %d\n',...
+    1, 1, y2i+Fwidth*cosd(dip), y3i+Fwidth*sind(dip),Vwidth, dip, w, 1.0);
 
 w = Vwidthbot/Mvbot;
 % segment 2 - Tpl below the fault at dip
-fprintf(fileID,'%d %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %d %d\n',...
-    1, -1,-fault_length/2, y2hinge, y3i+Tpl,fault_length, Vwidthbot, 0, dip, 90, fault_length, w, 1.0, 1.0);
+fprintf(fileID,'%d %.18f %.18f %.18f %.18f %.18f %.18f %d\n',...
+    1, -1, y2hinge, y3i+Tpl, Vwidthbot,dip, w, 1.0);
 
 % segment 3 - Tpl below the fault (flat)
-fprintf(fileID,'%d %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %d %d\n',...
-    1, -1,-fault_length/2, y2hinge-Vwidthbot, y3i+Tpl,fault_length, Vwidthbot, 0, 0*dip, 90, fault_length, w, 1.0, 1.0);
+fprintf(fileID,'%d %.18f %.18f %.18f %.18f %.18f %.18f %d\n',...
+    1, -1,y2hinge-Vwidthbot, y3i+Tpl,Vwidthbot, 0, w, 1.0);
 
 fclose(fileID);
 
-shz = unicycle.geometry.receiver(patchvname,earthModel);
+shz = fgeom.receiver(patchvname,earthModel);
 
 %% ESPM source
 % width of patch segments
-w = 8000e3;
+w = 100000e3;
 
 patchsrcname = 'espmfault2d.seg';
 
 fileID = fopen(patchsrcname,'w');
 fprintf(fileID,'%s\n',...
-    '# n  Vpl    x1     x2   x3   Length   Width   Strike  Dip  Rake    L0    W0    qL  qW');
+    '# n  Vpl    x2   x3    Width   Dip  W0  qW');
 
 % Three segments
 
 % segment 1 - below the fault
-fprintf(fileID,'%d %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %d %d\n',...
-    1, 1,-fault_length/2, y2i+(Vwidth+Fwidth)*cosd(dip), y3i+(Vwidth+Fwidth)*sind(dip),fault_length, w, 0, dip, 90, fault_length, w, 1.0, 1.0);
+fprintf(fileID,'%d %.18f %.18f %.18f %.18f %.18f %.18f %d\n',...
+    1, 1,y2i+(Vwidth+Fwidth)*cosd(dip), y3i+(Vwidth+Fwidth)*sind(dip),w, dip, w, 1.0);
 
 % segment 2 - Tpl below the fault at dip
-fprintf(fileID,'%d %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %d %d\n',...
-    1, -1,-fault_length/2, y2hinge+(Vwidthbot)*cosd(dip), y3i+Tpl+(Vwidthbot)*sind(dip),fault_length, w+Fwidth, 0, dip, 90, fault_length, w+Fwidth, 1.0, 1.0);
+fprintf(fileID,'%d %.18f %.18f %.18f %.18f %.18f %.18f %d\n',...
+    1, -1,y2hinge+(Vwidthbot)*cosd(dip), y3i+Tpl+(Vwidthbot)*sind(dip),w+Fwidth, dip, w+Fwidth, 1.0);
 
 % segment 3 - Tpl below the fault (flat)
-fprintf(fileID,'%d %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %.18f %d %d\n',...
-    1, -1,-fault_length/2, y2hinge-Vwidthbot-w, y3i+Tpl,fault_length, w, 0, 0*dip, 90, fault_length, w, 1.0, 1.0);
+fprintf(fileID,'%d %.18f %.18f %.18f %.18f %.18f %.18f %d\n',...
+    1, -1,y2hinge-Vwidthbot-w, y3i+Tpl, w, 0, w, 1.0);
 
 fclose(fileID);
 
-src = unicycle.geometry.receiver(patchsrcname,earthModel);
+src = fgeom.receiver(patchsrcname,earthModel);
 
 
 end

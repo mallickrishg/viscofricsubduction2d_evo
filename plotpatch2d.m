@@ -5,8 +5,8 @@ km2m = 1e3;
 xtop = rcv.x(:,1);
 xbot = rcv.x(:,1) + rcv.W.*cosd(rcv.dip);
 
-ztop = -rcv.x(:,3);
-zbot = -rcv.x(:,3) + rcv.W.*sind(rcv.dip);
+ztop = -rcv.x(:,2);
+zbot = -rcv.x(:,2) + rcv.W.*sind(rcv.dip);
 
 if nargin==2
     for i = 1:rcv.N

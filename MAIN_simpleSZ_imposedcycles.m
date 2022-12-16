@@ -4,15 +4,15 @@
 
 clear
 
-addpath ODESolving/
 addpath odefunction/
 addpath greenfunc/
+import fgeom.*
 addpath ~/Dropbox/scripts/topotoolbox/colormaps/
-addpath ~/Dropbox/scripts/unicycle/matlab/
-import unicycle.*
+% addpath ~/Dropbox/scripts/unicycle/matlab/
+% import unicycle.*
 
 % Rigidity (MPa)
-G = 40e3;
+G = 30e3;
 nu = 0.25;
 
 % starting point
@@ -22,7 +22,7 @@ y3i = 0;
 % Fault parameters
 Fwidth = 200e3;
 Mf = 100;% number of patches
-dip = 15;% in degrees
+dip = 10;% in degrees
 
 % Viscous domain
 Vwidth = 250e3;
@@ -33,12 +33,11 @@ Mvbot = 50;% number of patches
 % plate thickness
 Tplate = 50e3;
 %% Create faults and shear zones
-earthModel = unicycle.greens.okada92(G,nu);
-[rcv,shz,src] = create_flt_shz(earthModel,y2i,y3i,dip,Fwidth,Mf,Vwidth,Mv,Vwidthbot,Mvbot,Tplate);
+earthModel = fgeom.LDhs(G,nu);
+[rcv,shz,src] = create_flt_shz(earthModel,[y2i,y3i],dip,Fwidth,Mf,Vwidth,Mv,Vwidthbot,Mvbot,Tplate);
 
 % plate velocity
-Vpl = 1.5e-9; %(m/s)
-% Vpl = 3.0420564301467792e-09;
+Vpl = 1e-9; %(m/s)
 
 % impose earthquake parameters
 Teq = 200.*3.15e7;% earthquake every Teq years
@@ -59,7 +58,7 @@ axis tight equal, box on, grid on
 xlim([-1 1].*600)
 set(gca,'FontSize',20,'LineWidth',2)
 colorbar
-% return
+
 %% % % % % % % % % % % % % % % % % % % % % % % % % % % %
 %                                                      %
 %         F R I C T I O N   P A R A M E T E R S        %
@@ -67,15 +66,15 @@ colorbar
 % % % % % % % % % % % % % % % % % % % % % % % % % % % %%
 
 % effective confining pressure on fault (MPa)
-rcv.sigma = 100*ones(rcv.N,1);
+% rcv.sigma = 600*ones(rcv.N,1);
 % rcv.sigma(rcv.xc(:,1)<150e3) = 150;
-% rcv.sigma = linspace(100,400,rcv.N)';
+rcv.sigma = linspace(100,400,rcv.N)';
 
 % frictional parameters
 rcv.a = 1e-2*ones(rcv.N,1);
 rcv.b = rcv.a - 5e-3*ones(rcv.N,1);
 % velocity-weakening
-vw = abs(rcv.xc(:,1))>=0e3 & abs(rcv.xc(:,1))<=350e3;
+vw = abs(rcv.xc(:,1))>=0e3 & abs(rcv.xc(:,1))<=100e3;
 rcv.b(vw) = rcv.a(vw) + 5e-3;
 
 % static friction coefficient
@@ -85,7 +84,7 @@ rcv.mu0 = 0.6*ones(rcv.N,1);
 rcv.Vpl = Vpl.*rcv.Vpl;
 
 % reference slip rate (m/s)
-rcv.Vo = 1e-6*ones(rcv.N,1);
+rcv.Vo = Vpl*ones(rcv.N,1);
 
 % shear wave speed (m/s)
 rcv.Vs = 3e3*ones(rcv.N,1);
@@ -104,15 +103,18 @@ disp('Assigned Frictional Properties')
 shz.Vpl = Vpl.*shz.Vpl;
 
 % Viscosity in Pa-s
-% etaval_arc = 5e12;
-% etaval_arc = logspace(13,12,length(find(shz.Vpl>0)))';
-etaval_arc = 1e12.*linspace(10,1,length(find(shz.Vpl>0)))';
-etaval_oc = 1e16;
-power = 1;
+etaval_arc = 1e17;
+% etaval_arc = logspace(13,15,length(find(shz.Vpl>0)))';
+% etaval_arc = 1e13.*logspace(1,-1,length(find(shz.Vpl>0)))';
+power_arc = 5;%linspace(3,1,Mv);
+etaval_oc = 1e15;
+power_oc = 3;
 
-shz.tMax = power;% store power in 'tmax' parameter
-shz.a(shz.Vpl>0) = etaval_arc*1e-6;% store viscosity in 'a' parameter
-shz.a(shz.Vpl<0) = etaval_oc*1e-6;
+shz.n = ones(shz.N,1);% store power in 'tmax' parameter
+shz.n(shz.Vpl>0) = power_arc;
+shz.Ainverse = ones(shz.N,1);
+shz.Ainverse(shz.Vpl>0) = etaval_arc*1e-6;% store viscosity in 'a' parameter
+shz.Ainverse(shz.Vpl<0) = etaval_oc*1e-6;
 
 % degrees of freedom
 shz.dgf = 2;
@@ -121,23 +123,33 @@ shz.dgf = 2;
 evl.tau0     = - evl.KK*rcv.Vpl - evl.LK*shz.Vpl;
 evl.sigma0   = - evl.KL*rcv.Vpl - evl.LL*shz.Vpl;
 
-%% solve ODE
-disp('Solving ODE')
-
-% Initialize State Vector
-Y0=zeros(rcv.N*rcv.dgf+shz.N*shz.dgf,1);
 
 % Calculate shear stress change for IVP
-taumax = 5;
+taumax = 10;
+% smoothing using logistic function
+logit = @(x,x0,k) 1./(1 + exp(-k.*(x-x0)));
+xlogit = 30e3;% m
+klogit = 0.2;
+
 % eqslip = compute_earthquakeslip(rcv,evl,Teq*Vpl,taumax);
 eqslip = Teq*Vpl.*ones(rcv.N,1);
-eqslip(~vw) = 0;%eqslip(find(~vw,5,'first')) = Teq*Vpl;
+eqslip(~vw) = 0;
+for i = 1:2
+    if i == 1
+        index1 = 1;
+        index2 = find(vw,1)-1;
+        dslip = logit(rcv.xc(index1:index2,1)./1e3,rcv.xc(find(vw,1),1)./1e3-xlogit./1e3,klogit);
+    else
+        index1 = find(vw,1,'last')+1;
+        index2 = rcv.N;
+        dslip = 1-logit(rcv.xc(index1:index2,1)./1e3,rcv.xc(find(vw,1,'last'),1)./1e3+xlogit./1e3,klogit);
+    end
+    eqslip(index1:index2) = dslip.*(Teq*Vpl);
+end
 
+% compute stress change
 taueq = evl.KK*eqslip;
 taueq(taueq>taumax) = taumax;
-% np = 20;
-% taueq(find(~vw,1):find(~vw,1)+np) = linspace(0,taueq(find(~vw,1)+np),np+1);
-% taueq(taueq<0) = 0;
 
 taubot = evl.KL*eqslip;
 taubot(taubot>taumax) = taumax;
@@ -146,22 +158,34 @@ if true
     figure(10),clf
     subplot(211)
     plot(rcv.xc(:,1)./1e3,eqslip,'LineWidth',2)
+    axis tight, grid on
+    ylabel('Slip (m)')
+    yyaxis right
+    plot(rcv.xc(:,1)./1e3,taueq,'r-','Linewidth',2)
     axis tight
+    set(gca,'Fontsize',18)
     subplot(212)
-    plot(rcv.xc(:,1)./1e3,taueq,'r.'), hold on
+    plot(rcv.xc(:,1)./1e3,taueq,'r-'), hold on
     plot(shz.xc(:,1)./1e3,taubot,'kx')
     axis tight, grid on
     ylabel('\Delta\tau (MPa)')
     xlabel('x (km)')
-    ylim([-0.2 1].*taumax)
+    ylim([-1 1].*taumax)
+    set(gca,'Fontsize',18)
 end
 
+% return
+%% solve ODE
+disp('Solving ODE')
+
+% Initialize State Vector
+Y0=zeros(rcv.N*rcv.dgf+shz.N*shz.dgf,1);
 % initialize Y0
 Y0(1:rcv.dgf:rcv.N*rcv.dgf) = zeros(rcv.N,1);% slip
-Y0(2:rcv.dgf:rcv.N*rcv.dgf) = log(rcv.Vpl*1./rcv.Vo); % v
+Y0(2:rcv.dgf:rcv.N*rcv.dgf) = log(rcv.Vpl./rcv.Vo); % v
 
 % Shear zones
-Y0(rcv.N*rcv.dgf+1:shz.dgf:end) = shz.a.*shz.Vpl + zeros(shz.N,1); %stress12
+Y0(rcv.N*rcv.dgf+1:shz.dgf:end) = (shz.Ainverse.*shz.Vpl).^(1./shz.n) + zeros(shz.N,1); %stress12
 Y0(rcv.N*rcv.dgf+2:shz.dgf:end) = zeros(shz.N,1); %strain12
 % return
 %% Simulation 
@@ -174,7 +198,7 @@ yp=@(t,y) odeimposedViscoelastic_a_zerowidth(t,y,rcv,shz,evl);
 
 tic
 % Solve the system
-options=odeset('Refine',1,'AbsTol',1e-6,'RelTol',1e-6,'InitialStep',1e-6,'MaxStep',3e8,'oDir','ode_out/'); 
+options=odeset('Refine',1,'AbsTol',1e-6,'RelTol',1e-6,'InitialStep',1e-6,'MaxStep',3e8); 
 for i = 1:ncycles
     if i==1
         [t,Y]=ode45(yp,[0 Teq],Y0,options);
@@ -204,16 +228,16 @@ slip = Y(:,1:rcv.dgf:rcv.N*rcv.dgf);
 
 s12 = Y(:,rcv.N*rcv.dgf+1:shz.dgf:rcv.N*rcv.dgf+shz.N*shz.dgf);
 e12 = Y(:,rcv.N*rcv.dgf+2:shz.dgf:rcv.N*rcv.dgf+shz.N*shz.dgf);
-e12d = s12./repmat(shz.a',size(Y,1),1);
+e12d = (s12.^repmat(shz.n',size(Y,1),1))./repmat(shz.Ainverse',size(Y,1),1);
 
 toc
 disp('ODE Solution')
-
+% return
 %% displacement kernels
 ng = 700;
 ox = linspace(-100e3,600e3,ng)';
 
-GF_d = compute_displacementkernels([ox 0.*ox 0.*ox],rcv,shz,src);
+GF_d = compute_displacementkernels([ox 0.*ox],rcv,shz,src);
 
 % surface velocity
 gps = [];
@@ -269,8 +293,8 @@ for i = 1:length(plotindex)
     subplot(length(plotindex),1,i)
 
     tindex = find(t>plotindex(i),1);
-    plot(rcv.xc(:,1)./1e3,slip(tindex,:)'-eqslip-V(end,:)'.*t(tindex),'x-','LineWidth',3), hold on
-    plot(shz.xc(:,1)./1e3,e12(tindex,:)-e12d(end,:).*t(tindex),'d','Linewidth',2)
+    plot(rcv.xc(:,1)./1e3,slip(tindex,:)'-eqslip-0*V(end,:)'.*t(tindex),'x-','LineWidth',2), hold on
+    plot(shz.xc(:,1)./1e3,e12(tindex,:)-0.*e12d(end,:).*t(tindex),'d','Linewidth',2)
     ylabel('Slip (m)'), xlabel('x (km)')
     axis tight, grid on
     xlim([-100 500]), 
@@ -330,7 +354,7 @@ for i = 1:length(plotindex)
 end
 subplot(223)
 legend('200 km','250 km','300 km','350 km','400 km','location','best')
-return
+% return
 
 %% plot surface velocities
 figure(11),clf
@@ -384,87 +408,88 @@ set(gca,'Fontsize',20,'Linewidth',2)
 % horizontal motion
 
 % cspec = parula(length(plotindex));
-
-figure(12),clf
-set(gcf,'Name','Horizontal velocity contributions')
-for i = 1:length(plotindex)
-    tindex = find(abs(t-plotindex(i))==min(abs(t-plotindex(i))),1);
-    e12dplot = e12d(tindex,:);
-    e12dplot(shz.Vpl>0) = 0;
-    
+if false
+    figure(12),clf
+    set(gcf,'Name','Horizontal velocity contributions')
+    for i = 1:length(plotindex)
+        tindex = find(abs(t-plotindex(i))==min(abs(t-plotindex(i))),1);
+        e12dplot = e12d(tindex,:);
+        e12dplot(shz.Vpl>0) = 0;
+        
+        subplot(321)
+        toplot = GF_d.shz.Gh*e12dplot';
+        plot(ox./1e3,(gps.src.vh' + toplot)./Vpl,'-','LineWidth',2,'Color',cspec(i,:)), hold on
+        subplot(322)
+        toplot = GF_d.shz.Gz*e12dplot';
+        plot(ox./1e3,(gps.src.vz' + toplot)./Vpl,'-','LineWidth',2,'Color',cspec(i,:)), hold on
+    end
     subplot(321)
-    toplot = GF_d.shz.Gh*e12dplot';
-    plot(ox./1e3,(gps.src.vh' + toplot)./Vpl,'-','LineWidth',2,'Color',cspec(i,:)), hold on
+    title('Oceanic mantle')
+    axis tight, grid on
+    ylim([-1 2])
+    xlabel('x_2 (km)')
+    ylabel('v_h/v_{pl}')
+    set(gca,'Fontsize',20,'LineWidth',2)
     subplot(322)
-    toplot = GF_d.shz.Gz*e12dplot';
-    plot(ox./1e3,(gps.src.vz' + toplot)./Vpl,'-','LineWidth',2,'Color',cspec(i,:)), hold on
-end
-subplot(321)
-title('Oceanic mantle')
-axis tight, grid on
-ylim([-1 2])
-xlabel('x_2 (km)')
-ylabel('v_h/v_{pl}')
-set(gca,'Fontsize',20,'LineWidth',2)
-subplot(322)
-title('Oceanic mantle')
-axis tight, grid on
-ylim([-1 1])
-xlabel('x_2 (km)')
-ylabel('v_z/v_{pl}')
-set(gca,'Fontsize',20,'LineWidth',2)
-
-for i = 1:length(plotindex)
-    tindex = find(abs(t-plotindex(i))==min(abs(t-plotindex(i))),1);
-    e12dplot = e12d(tindex,:);
-    e12dplot(shz.Vpl<0) = 0;
+    title('Oceanic mantle')
+    axis tight, grid on
+    ylim([-1 1])
+    xlabel('x_2 (km)')
+    ylabel('v_z/v_{pl}')
+    set(gca,'Fontsize',20,'LineWidth',2)
     
+    for i = 1:length(plotindex)
+        tindex = find(abs(t-plotindex(i))==min(abs(t-plotindex(i))),1);
+        e12dplot = e12d(tindex,:);
+        e12dplot(shz.Vpl<0) = 0;
+        
+        subplot(323)
+        toplot = GF_d.shz.Gh*e12dplot';
+        plot(ox./1e3,(toplot)./Vpl,'-','LineWidth',2,'Color',cspec(i,:)), hold on
+        subplot(324)
+        toplot = GF_d.shz.Gz*e12dplot';
+        plot(ox./1e3,(toplot)./Vpl,'-','LineWidth',2,'Color',cspec(i,:)), hold on
+    end
     subplot(323)
-    toplot = GF_d.shz.Gh*e12dplot';
-    plot(ox./1e3,(toplot)./Vpl,'-','LineWidth',2,'Color',cspec(i,:)), hold on
+    title('Arc mantle')
+    axis tight, grid on
+    ylim([-1 1])
+    xlabel('x_2 (km)')
+    ylabel('v_h/v_{pl}')
+    set(gca,'Fontsize',20,'LineWidth',2)
     subplot(324)
-    toplot = GF_d.shz.Gz*e12dplot';
-    plot(ox./1e3,(toplot)./Vpl,'-','LineWidth',2,'Color',cspec(i,:)), hold on
-end
-subplot(323)
-title('Arc mantle')
-axis tight, grid on
-ylim([-1 1])
-xlabel('x_2 (km)')
-ylabel('v_h/v_{pl}')
-set(gca,'Fontsize',20,'LineWidth',2)
-subplot(324)
-title('Arc mantle')
-axis tight, grid on
-ylim([-1 1])
-xlabel('x_2 (km)')
-ylabel('v_z/v_{pl}')
-set(gca,'Fontsize',20,'LineWidth',2)
-
-for i = 1:length(plotindex)
-    tindex = find(abs(t-plotindex(i))==min(abs(t-plotindex(i))),1);    
+    title('Arc mantle')
+    axis tight, grid on
+    ylim([-1 1])
+    xlabel('x_2 (km)')
+    ylabel('v_z/v_{pl}')
+    set(gca,'Fontsize',20,'LineWidth',2)
     
+    for i = 1:length(plotindex)
+        tindex = find(abs(t-plotindex(i))==min(abs(t-plotindex(i))),1);
+        
+        subplot(325)
+        toplot = GF_d.rcv.Gh*V(tindex,:)';
+        plot(ox./1e3,(toplot)./Vpl,'-','LineWidth',2,'Color',cspec(i,:)), hold on
+        subplot(326)
+        toplot = GF_d.rcv.Gz*V(tindex,:)';
+        plot(ox./1e3,(toplot)./Vpl,'-','LineWidth',2,'Color',cspec(i,:)), hold on
+    end
     subplot(325)
-    toplot = GF_d.rcv.Gh*V(tindex,:)';
-    plot(ox./1e3,(toplot)./Vpl,'-','LineWidth',2,'Color',cspec(i,:)), hold on
+    title('Fault')
+    axis tight, grid on
+    ylim([-1 1])
+    xlabel('x_2 (km)')
+    ylabel('v_h/v_{pl}')
+    set(gca,'Fontsize',20,'LineWidth',2)
     subplot(326)
-    toplot = GF_d.rcv.Gz*V(tindex,:)';
-    plot(ox./1e3,(toplot)./Vpl,'-','LineWidth',2,'Color',cspec(i,:)), hold on
+    title('Fault')
+    axis tight, grid on
+    ylim([-1 1])
+    xlabel('x_2 (km)')
+    ylabel('v_z/v_{pl}')
+    set(gca,'Fontsize',20,'LineWidth',2)
 end
-subplot(325)
-title('Fault')
-axis tight, grid on
-ylim([-1 1])
-xlabel('x_2 (km)')
-ylabel('v_h/v_{pl}')
-set(gca,'Fontsize',20,'LineWidth',2)
-subplot(326)
-title('Fault')
-axis tight, grid on
-ylim([-1 1])
-xlabel('x_2 (km)')
-ylabel('v_z/v_{pl}')
-set(gca,'Fontsize',20,'LineWidth',2)
 % return
 %% make plots of fault+shz slip rates
 % timeseries snapshots
@@ -479,7 +504,7 @@ for i = 1:length(plotindex)
     %plot(shz.xc(index,1)./1e3,e12d(tindex,index)./Vpl,'-','LineWidth',2,'Color',cspec(i,:))
 end
 axis tight, grid on
-xlim([min(shz.xc(:,1)) max(shz.xc(:,1))]./1e3)
+% xlim([min(shz.xc(:,1)) max(shz.xc(:,1))]./1e3)
 xlabel('x_2 (km)')
 ylabel('V/V_{pl}')
 set(gca,'LineWidth',2,'FontSize',20)
@@ -501,7 +526,7 @@ ylabel('V/V_{pl}')
 set(gca,'LineWidth',2,'FontSize',20)
 
 
-% late interseismic sliprates
+%% late interseismic sliprates
 index = shz.Vpl>0;
 figure(4),clf
 subplot(211)
@@ -528,15 +553,16 @@ legend('oceanic viscous')
 set(legend,'location','best')
 set(gca,'LineWidth',2,'FontSize',15,'YDir','reverse')
 
-
-figure(5),clf
-plotpatch2d(rcv,V(end,:)./Vpl), hold on
-plotpatch2d(shz,abs(e12d(end,:)./Vpl))
-plotpatch2d(src,abs(src.Vpl./Vpl))
-plot(src.x(:,1)./1e3,src.x(:,3)./1e3,'rx')
-axis tight equal, box on, grid on
-xlim([-1 1].*600)
-cb= colorbar;
-colormap(jet(20))
-caxis([0 1])
-set(gca,'LineWidth',2,'FontSize',15)
+if false
+    figure(5),clf
+    plotpatch2d(rcv,V(end,:)./Vpl), hold on
+    plotpatch2d(shz,abs(e12d(end,:)./Vpl))
+    plotpatch2d(src,abs(src.Vpl./Vpl))
+    plot(src.x(:,1)./1e3,src.x(:,3)./1e3,'rx')
+    axis tight equal, box on, grid on
+    xlim([-1 1].*600)
+    cb= colorbar;
+    colormap(jet(20))
+    caxis([0 1])
+    set(gca,'LineWidth',2,'FontSize',15)
+end
