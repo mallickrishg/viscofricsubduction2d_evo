@@ -25,13 +25,13 @@ Mf = 100;% number of patches
 dip = 10;% in degrees
 
 % Viscous domain
-Vwidth = 250e3;
-Mv = 50;% number of patches
+Vwidth = 200e3;
+Mv = 100;% number of patches
 Vwidthbot = 500e3;
-Mvbot = 50;% number of patches
+Mvbot = 200;% number of patches
 
 % plate thickness
-Tplate = 20e3;
+Tplate = 40e3;
 %% Create faults and shear zones
 earthModel = fgeom.LDhs(G,nu);
 [rcv,shz,src] = create_flt_shz(earthModel,[y2i,y3i],dip,Fwidth,Mf,Vwidth,Mv,Vwidthbot,Mvbot,Tplate);
@@ -39,9 +39,16 @@ earthModel = fgeom.LDhs(G,nu);
 % plate velocity
 Vpl = 1e-9; %(m/s)
 
+% displacement kernels
+ng = 700;
+ox = linspace(-100e3,600e3,ng)';
+
+GF_d = compute_displacementkernels([ox 0.*ox],rcv,shz,src);
+
+
 % impose earthquake parameters
-Teq = 200.*3.15e7;% earthquake every Teq years
-ncycles = 10;%20000*3.15e7/Teq; % number of earthquake cycles
+Teq = 500.*3.15e7;% earthquake every Teq years
+ncycles = 20;%20000*3.15e7/Teq; % number of earthquake cycles
 
 %% Stress Kernels and EVL object
 
@@ -67,7 +74,7 @@ colorbar
 
 % effective confining pressure on fault (MPa)
 % rcv.sigma = 600*ones(rcv.N,1);
-rcv.sigma = linspace(600,400,rcv.N)';
+rcv.sigma = linspace(100,300,rcv.N)';
 
 % frictional parameters
 rcv.a = 1e-2*ones(rcv.N,1);
@@ -102,11 +109,11 @@ disp('Assigned Frictional Properties')
 shz.Vpl = Vpl.*shz.Vpl;
 
 % Viscosity in Pa-s
-etaval_arc = 1e14;
-% etaval_arc = logspace(13,15,length(find(shz.Vpl>0)))';
+% etaval_arc = 1e17;
+etaval_arc = logspace(17,19,Mv)';
 % etaval_arc = 1e13.*logspace(1,-1,length(find(shz.Vpl>0)))';
-power_arc = 3;%linspace(3,1,Mv);
-etaval_oc = 1e16;
+power_arc = linspace(3,1,Mv);
+etaval_oc = 1e14;
 power_oc = 1;
 
 shz.n = ones(shz.N,1);% store power in 'tmax' parameter
@@ -128,8 +135,8 @@ evl.sigma0   = - evl.KL*rcv.Vpl - evl.LL*shz.Vpl;
 taumax = 10;
 % smoothing using logistic function
 logit = @(x,x0,k) 1./(1 + exp(-k.*(x-x0)));
-xlogit = 30e3;% m
-klogit = 0.2;
+xlogit = 50e3;% m
+klogit = 0.15;
 
 % eqslip = compute_earthquakeslip(rcv,evl,Teq*Vpl,taumax);
 eqslip = Teq*Vpl.*ones(rcv.N,1);
@@ -198,7 +205,7 @@ yp=@(t,y) odeimposedViscoelastic_a_zerowidth(t,y,rcv,shz,evl);
 
 tic
 % Solve the system
-options=odeset('Refine',1,'AbsTol',1e-6,'RelTol',1e-6,'InitialStep',1e-6,'MaxStep',3e8); 
+options=odeset('Refine',1,'AbsTol',1e-6,'RelTol',1e-6,'InitialStep',1e-1,'MaxStep',3e8); 
 for i = 1:ncycles
     if i==1
         [t,Y]=ode45(yp,[0 Teq],Y0,options);
@@ -230,14 +237,12 @@ s12 = Y(:,rcv.N*rcv.dgf+1:shz.dgf:rcv.N*rcv.dgf+shz.N*shz.dgf);
 e12 = Y(:,rcv.N*rcv.dgf+2:shz.dgf:rcv.N*rcv.dgf+shz.N*shz.dgf);
 e12d = (s12.^repmat(shz.n',size(Y,1),1))./repmat(shz.Ainverse',size(Y,1),1);
 
+slip_post = slip-eqslip'-t*V(end,:);
+e12_post = e12 - t*e12d(end,:);
+
 toc
 disp('ODE Solution')
 % return
-%% displacement kernels
-ng = 700;
-ox = linspace(-100e3,600e3,ng)';
-
-GF_d = compute_displacementkernels([ox 0.*ox],rcv,shz,src);
 
 % surface velocity
 gps = [];
@@ -249,13 +254,16 @@ gps.src.vh = Vpl.*(GF_d.src.Gh*src.Vpl)';
 gps.src.vz = Vpl.*(GF_d.src.Gz*src.Vpl)';
 
 %% plot surface displacement timeseries
-usurf_h = (GF_d.rcv.Gh*(slip-eqslip')')' + (GF_d.shz.Gh*e12')' + 1*(GF_d.src.Gh*(t*(Vpl.*src.Vpl'))')';
-usurf_z = (GF_d.rcv.Gz*(slip-eqslip')')' + (GF_d.shz.Gz*e12')' + 1.*(GF_d.src.Gz*(t*(Vpl.*src.Vpl'))')';
+usurf_h = (GF_d.rcv.Gh*(slip-eqslip')')' + (GF_d.shz.Gh*e12')' + (GF_d.src.Gh*(t*(Vpl.*src.Vpl'))')';
+usurf_z = (GF_d.rcv.Gz*(slip-eqslip')')' + (GF_d.shz.Gz*e12')' + (GF_d.src.Gz*(t*(Vpl.*src.Vpl'))')';
 
 % remove late interseismic effects
-% usurf_h = usurf_h - t*(gps.src.vh.*1 + gps.shz.vh(end,:) + gps.rcv.vh(end,:));
-% usurf_z = usurf_z - t*(gps.src.vz.*1 + gps.shz.vz(end,:) + gps.rcv.vz(end,:));
+usurf_h = usurf_h - t*(gps.src.vh.*1 + gps.shz.vh(end,:) + gps.rcv.vh(end,:));
+usurf_z = usurf_z - t*(gps.src.vz.*1 + gps.shz.vz(end,:) + gps.rcv.vz(end,:));
 
+% time integration from a specific time step
+% usurf_h = usurf_h - usurf_h(find(t>86400*30,1),:);
+% usurf_z = usurf_z - usurf_z(find(t>86400*30,1),:);
 %% plot cumulative displacements
 if false
     figure(1),clf
@@ -278,18 +286,21 @@ if false
     xlim([8e4 Teq]./3.15e7)
     set(gca,'FontSize',20,'Linewidth',2,'TickDir','out','XScale','log')
 end
-% plot lines - time series
+
+% plot lines - time series of surface displacement
 figure(100),clf
 plot(ox./1e3,usurf_h(end,:),'k-','Linewidth',2), hold on
+plot(ox./1e3,GF_d.rcv.Gh*eqslip,'k-.','Linewidth',2)
 % plot(ox./1e3,GF_d.src.Gh*(t(end)*Vpl*src.Vpl),'k--','Linewidth',2)
 plot(ox./1e3,usurf_z(end,:),'r-','Linewidth',2)
+plot(ox./1e3,GF_d.rcv.Gz*eqslip,'r-.','Linewidth',2)
 % plot(ox./1e3,GF_d.src.Gz*(t(end)*Vpl*src.Vpl),'r--','Linewidth',2)
-
 axis tight, grid on
 % ylim([-1 1]*2)
 xlabel('x_2 (km)'), ylabel('u (m)')
 set(gca,'FontSize',20,'Linewidth',2,'TickDir','out')
 
+%% on-fault slip/strain
 figure(102),clf
 plotindex = [0.1,1,10].*3.15e7;
 for i = 1:length(plotindex)    
@@ -300,11 +311,23 @@ for i = 1:length(plotindex)
     plot(shz.xc(:,1)./1e3,e12(tindex,:)-0.*e12d(end,:).*t(tindex),'d','Linewidth',2)
     ylabel('Slip (m)'), xlabel('x (km)')
     axis tight, grid on
-    xlim([-100 500]), 
+    xlim([-100 500]), ylim(1.2*[-1 1].*max(abs(get(gca,'YLim'))))
     title(['\Delta t = ' num2str(plotindex(i)./3.15e7,'%.1f'), ' yr'])
-    set(gca,'XScale','lin','Fontsize',20,'Linewidth',1.5)
+    set(gca,'XScale','lin','Fontsize',15,'Linewidth',1.5)
 end
 
+% fault slip/strain with interseismic contribution removed
+figure(1000),clf
+plot(rcv.xc(:,1)./1e3,slip_post(end,:),'-','Linewidth',4), hold on
+plot(shz.xc(shz.Vpl>0,1)./1e3,e12_post(end,shz.Vpl>0),'-','Linewidth',4)
+plot(rcv.xc(:,1)./1e3,eqslip,'k-.','Linewidth',2)
+plot(rcv.xc(:,1)./1e3,V(end,:)*t(end),'k-','Linewidth',2)
+plot(shz.xc(shz.Vpl>0,1)./1e3,e12d(end,shz.Vpl>0)*t(end),'k-','Linewidth',2)
+axis tight, grid on
+xlabel('x_2 (km)'), ylabel('Postseismic slip (m)')
+set(gca,'FontSize',20,'Linewidth',2,'TickDir','out')
+
+%% surface displacement snapshots
 figure(101),clf
 for i = 1:length(plotindex)
     subplot(length(plotindex),1,i)
@@ -316,6 +339,26 @@ for i = 1:length(plotindex)
     xlim([-100 500]),ylim([-1 1]*max(abs(get(gca,'YLim'))))
     title(['\Delta t = ' num2str(plotindex(i)./3.15e7,'%.1f'), ' yr'])
     legend('u_h','u_z')
+    set(gca,'XScale','lin','Fontsize',15,'Linewidth',1.5)
+end
+
+plotindex = [logspace(-1,1,10)].*3.15e7;
+cspec = cool(length(plotindex));
+figure(201),clf
+for i = 1:length(plotindex)
+    subplot(2,1,1)
+    tindex = find(t>plotindex(i),1);
+    plot(ox./1e3,-usurf_h(tindex,:),'-','Linewidth',2,'Color',cspec(i,:)), hold on
+    axis tight, grid on
+    ylabel('u_h (m)'), xlabel('x (km)')
+    xlim([-100 500]),ylim([-1 1]*max(abs(get(gca,'YLim'))))
+    set(gca,'XScale','lin','Fontsize',20,'Linewidth',1.5)
+    subplot(2,1,2)
+    tindex = find(t>plotindex(i),1);
+    plot(ox./1e3,usurf_z(tindex,:),'-','Linewidth',2,'Color',cspec(i,:)), hold on
+    axis tight, grid on
+    ylabel('u_z (m)'), xlabel('x (km)')
+    xlim([-100 500]),ylim([-1 1]*max(abs(get(gca,'YLim'))))
     set(gca,'XScale','lin','Fontsize',20,'Linewidth',1.5)
 end
 
@@ -363,7 +406,7 @@ legend('200 km','250 km','300 km','350 km','400 km','location','best')
 figure(11),clf
 % plotindex = [0.05:0.05:0.95].*Teq;
 % plotindex = [1,3,5,10,20,30,50,70,80,90,100,150,200].*3.15e7;
-plotindex = [10,50,100,150,200].*3.15e7;
+plotindex = [10,20,50,70,100,150,200].*3.15e7;
 p = [];
 lgd = {};
 
@@ -411,7 +454,7 @@ set(gca,'Fontsize',20,'Linewidth',2)
 % horizontal motion
 
 % cspec = parula(length(plotindex));
-if true
+if false
     figure(12),clf
     set(gcf,'Name','Horizontal velocity contributions')
     for i = 1:length(plotindex)
@@ -540,13 +583,13 @@ xlabel('x_2 (km)')
 ylabel('V/V_{pl}')
 legend('friction','arc viscous')
 set(legend,'location','best')
-ylim([0 1])
+ylim([0 1.1])
 xlim([min(shz.xc(:,1)) max(shz.xc(:,1))]./1e3)
 set(gca,'LineWidth',2,'FontSize',15)
 
 index = shz.Vpl<0;
 subplot(212)
-plot(shz.xc(index,1)./1e3,e12d(end,index)./Vpl,'s','LineWidth',1,'MarkerFaceColor',rgb('steelblue'))
+plot(shz.xc(index,1)./1e3,e12d(end,index)./Vpl,'.','LineWidth',3,'Color',rgb('violet'),'MarkerSize',8)
 axis tight, box on, grid on
 ylim([-1.1 0])
 xlim([min(shz.xc(:,1)) max(shz.xc(:,1))]./1e3)
@@ -569,3 +612,27 @@ if false
     caxis([0 1])
     set(gca,'LineWidth',2,'FontSize',15)
 end
+
+%% store data in output file
+return
+outfilename = 'tobi/results_file.h5';
+rcvtable = [rcv.xc,rcv.W,rcv.a-rcv.b,rcv.sigma,rcv.Vpl];
+shztable = [shz.xc,shz.W,shz.n,shz.Ainverse,shz.Vpl];
+
+h5create(outfilename, '/details/Trecur', size(Teq))
+h5create(outfilename, '/details/coseismicslip', size(eqslip))
+
+h5create(outfilename, '/rcv', size(rcvtable))
+h5create(outfilename, '/shz', size(shztable))
+h5create(outfilename, '/t', size(t))
+h5create(outfilename, '/V_fault',size(V))
+h5create(outfilename,'/V_viscous',size(e12d))
+
+h5write(outfilename,'/details/Trecur', Teq)
+h5write(outfilename,'/details/coseismicslip', eqslip)
+h5write(outfilename,'/rcv', rcvtable)
+h5write(outfilename,'/shz', shztable)
+h5write(outfilename,'/t', t)
+h5write(outfilename,'/V_fault', V)
+h5write(outfilename,'/V_viscous', e12d)
+
