@@ -64,7 +64,7 @@ classdef fpatch < handle
                 % list of patches for current segment
                 flt=fgeom.flt2flt([x1(k);x3(k)],width(k),d(k),wo(k),alphaw(k));                                                   
                 % list of patches for all segments
-                fm=[fm;[flt,Vpl(k).*ones(size(flt,1))]];
+                fm=[fm;[flt,Vpl(k).*ones(size(flt,1),1)]];
             end
                        
         end
