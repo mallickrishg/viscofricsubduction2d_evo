@@ -4,3 +4,4 @@ ode_out/
 Figures/
 *.seg
 tobi/
+.DS_Store
