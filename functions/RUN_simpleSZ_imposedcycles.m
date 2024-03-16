@@ -3,12 +3,6 @@ function [rcv,shz,src,results] = RUN_simpleSZ_imposedcycles(faultparams,shzparam
 % earthquakes at a recgular interval for a subduction zone in 2-d
 % Rishav Mallick, EOS, 2021
 
-addpath ODESolving/
-addpath odefunction/
-addpath greenfunc/
-addpath ~/Dropbox/scripts/unicycle/matlab/
-import unicycle.*
-
 % Rigidity (MPa)
 G = 30e3;
 nu = 0.25;
@@ -30,8 +24,8 @@ Mvbot = 100;
 % plate thickness
 Tplate = faultparams.Tplate;
 %% Create faults and shear zones
-earthModel = unicycle.greens.okada92(G,nu);
-[rcv,shz,src] = create_flt_shz(earthModel,y2i,y3i,faultparams.dip,Fwidth,Mf,Vwidth,Mv,Vwidthbot,Mvbot,Tplate);
+earthModel = fgeom.LDhs(G,nu);
+[rcv,shz,src] = create_flt_shz(earthModel,[y2i,y3i],faultparams.dip,Fwidth,Mf,Vwidth,Mv,Vwidthbot,Mvbot,Tplate);
 
 % plate velocity
 Vpl = faultparams.Vpl; %(m/s)
@@ -58,7 +52,7 @@ rcv.sigma = 50*ones(rcv.N,1);
 rcv.a = 1e-2*ones(rcv.N,1);
 rcv.b = rcv.a - 5e-3*ones(rcv.N,1);
 % velocity-weakening
-vw = abs(rcv.xc(:,3))>=.2e3 & abs(rcv.xc(:,3))<=35e3;
+vw = abs(rcv.xc(:,2))>=0e3 & abs(rcv.xc(:,2))<=35e3;
 rcv.b(vw) = rcv.a(vw) + 5e-3;
 
 % static friction coefficient
@@ -91,9 +85,10 @@ etaval_arc = shzparams.eta_arc;
 etaval_oc = shzparams.eta_oc;
 power = 1;
 
-shz.tMax = power;% store power in 'tmax' parameter
-shz.a(shz.Vpl>0) = etaval_arc*1e-6;% store viscosity in 'a' parameter
-shz.a(shz.Vpl<0) = etaval_oc*1e-6;
+shz.n = power;% store power in 'tmax' parameter
+shz.Ainverse = ones(shz.N,1);
+shz.Ainverse(shz.Vpl>0) = etaval_arc*1e-6;% store viscosity in 'a' parameter
+shz.Ainverse(shz.Vpl<0) = etaval_oc*1e-6;
 
 % degrees of freedom
 shz.dgf = 2;
@@ -132,7 +127,7 @@ yp=@(t,y) odeimposedViscoelastic_a_zerowidth(t,y,rcv,shz,evl);
 
 tic
 % Solve the system
-options=odeset('Refine',1,'AbsTol',1e-6,'RelTol',1e-6,'InitialStep',1e-6,'MaxStep',3e8,'oDir','ode_out/'); 
+options=odeset('Refine',1,'AbsTol',1e-6,'RelTol',1e-6,'InitialStep',1e-6,'MaxStep',3e8); 
 for i = 1:ncycles
     if i==1
         [t,Y]=ode45(yp,[0 Teq],Y0,options);
@@ -162,7 +157,8 @@ V(:,vw) = 0;
 
 s12 = Y(:,rcv.N*rcv.dgf+1:shz.dgf:rcv.N*rcv.dgf+shz.N*shz.dgf);
 % e12 = Y(:,rcv.N*rcv.dgf+2:shz.dgf:rcv.N*rcv.dgf+shz.N*shz.dgf);
-e12d = s12./repmat(shz.a',size(Y,1),1);
+% e12d = s12./repmat(shz.a',size(Y,1),1);
+e12d = (s12.^repmat(shz.n',size(Y,1),1))./repmat(shz.Ainverse',size(Y,1),1);
 
 results = [];
 results.t = t;
