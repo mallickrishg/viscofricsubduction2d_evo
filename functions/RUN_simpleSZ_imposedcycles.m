@@ -114,7 +114,7 @@ Y0(1:rcv.dgf:rcv.N*rcv.dgf) = zeros(rcv.N,1);% slip
 Y0(2:rcv.dgf:rcv.N*rcv.dgf) = log(rcv.Vpl*0.99./rcv.Vo); % v
 
 % Shear zones
-Y0(rcv.N*rcv.dgf+1:shz.dgf:end) = 1e-9 + zeros(shz.N,1); %stress12
+Y0(rcv.N*rcv.dgf+1:shz.dgf:end) = (shz.Ainverse.*shz.Vpl).^(1./shz.n) + zeros(shz.N,1); %stress12
 Y0(rcv.N*rcv.dgf+2:shz.dgf:end) = zeros(shz.N,1); %strain12
 
 %% Simulation 
