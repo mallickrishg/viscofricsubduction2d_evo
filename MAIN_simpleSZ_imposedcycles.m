@@ -6,8 +6,9 @@ clear
 
 addpath functions/
 addpath odefunction/
+addpath colormaps/
 import fgeom.*
-addpath ~/Dropbox/scripts/topotoolbox/colormaps/
+% addpath ~/Dropbox/scripts/topotoolbox/colormaps/
 % addpath ~/Dropbox/scripts/unicycle/matlab/
 % import unicycle.*
 
