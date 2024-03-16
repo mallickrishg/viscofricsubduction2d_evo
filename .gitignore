@@ -5,3 +5,4 @@ Figures/
 *.seg
 tobi/
 .DS_Store
+*.seg
